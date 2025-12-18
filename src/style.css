@@ -1,912 +1,748 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>客服SOP系统 终局演示 (稳定渐显版)</title>
-    <style>
-        :root {
-            --bg-color: #dce4ef;
-            --ios-green: #34c759;
-            --agent-blue: #1890ff;
-            --agent-bg: #fff;
-            --border-color: #e8e8e8;
-            --text-main: #333;
-            --resizer-width: 6px;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-
-        body {
-            height: 100vh;
-            display: flex; justify-content: center; align-items: center;
-            background-color: var(--bg-color); overflow: hidden; padding: 20px;
-            position: relative;
-        }
-
-        /* ================= 1. 动态水印 ================= */
-        .watermark-layer {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 9999; opacity: 0.08;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' transform='rotate(-30, 200, 200)' font-size='24' font-family='sans-serif' fill='%23000'%3Edesign by zhangjunxu%3C/text%3E%3C/svg%3E");
-            animation: watermarkMove 60s linear infinite;
-        }
-        @keyframes watermarkMove { 0% { background-position: 0 0; } 100% { background-position: 600px 600px; } }
-
-        /* ================= 2. 全局暗色遮罩 ================= */
-        #focus-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 100; 
-            opacity: 0; pointer-events: none;
-            transition: opacity 0.6s ease;
-        }
-        #focus-overlay.active { opacity: 1; pointer-events: auto; }
-
-        /* ================= 3. 开始/结束 弹窗 ================= */
-        .overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.92); z-index: 5000;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            color: white; backdrop-filter: blur(10px);
-            transition: opacity 0.5s ease-in-out, visibility 0.5s;
-            opacity: 1; visibility: visible;
-        }
-        .overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-        
-        .overlay-title { font-size: 38px; font-weight: bold; margin-bottom: 20px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); letter-spacing: 1px; }
-        .overlay-sub { font-size: 16px; opacity: 0.8; margin-bottom: 50px; font-weight: 300; }
-        
-        /* 结束页面的场景描述文字 - 渐显动画版 */
-        .overlay-desc {
-            text-align: left; 
-            line-height: 1.8; 
-            max-width: 900px; 
-            margin-bottom: 40px; 
-            font-size: 22px; /* 大字体 */
-            font-weight: 500;
-            background: rgba(255,255,255,0.1); 
-            padding: 40px; 
-            border-radius: 16px;
-            border: 1px solid rgba(255,255,255,0.2); 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-            
-            /* 初始状态：透明且下沉 */
-            opacity: 0;
-            transform: translateY(30px);
-            /* 过渡效果：延迟 0.3s 执行，让背景先黑，文字再浮现 */
-            transition: all 1s cubic-bezier(0.22, 1, 0.36, 1) 0.3s;
-        }
-
-        /* 当遮罩显示时，文字激活状态 */
-        .overlay:not(.hidden) .overlay-desc {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .overlay-footer { 
-            position: absolute; bottom: 30px; 
-            font-size: 16px; font-weight: bold; opacity: 0.6; letter-spacing: 1px; font-family: monospace; 
-        }
-        
-        .btn-group { display: flex; gap: 30px; }
-        .primary-btn {
-            padding: 18px 45px; font-size: 18px; font-weight: bold;
-            color: white; border: none; border-radius: 50px;
-            cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            transition: transform 0.2s, box-shadow 0.2s; display: flex; align-items: center; gap: 10px;
-        }
-        .btn-manual { background: linear-gradient(135deg, #1890ff, #096dd9); }
-        .btn-auto { background: linear-gradient(135deg, #722ed1, #531dab); }
-        .btn-restart { background: linear-gradient(135deg, #fa8c16, #d46b08); }
-        .primary-btn:hover { transform: translateY(-3px); box-shadow: 0 15px 40px rgba(0,0,0,0.4); }
-
-        /* ================= 4. Toast ================= */
-        .auto-toast {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
-            background: rgba(0, 0, 0, 0.85); color: #fff; padding: 15px 30px;
-            border-radius: 40px; font-size: 16px; z-index: 2000;
-            display: flex; align-items: center; gap: 12px;
-            opacity: 0; pointer-events: none;
-            transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2);
-        }
-        .auto-toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        .spinner {
-            width: 18px; height: 18px; border: 3px solid #fff; border-top-color: transparent; border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* ================= 5. 主容器 ================= */
-        .app-container {
-            display: flex; width: 100%; height: 100%; max-width: 1900px;
-            gap: 20px; align-items: stretch; position: relative;
-        }
-
-        /* 左侧手机 */
-        .iphone-mockup {
-            width: 375px; height: 100%; max-height: 850px; background: #f2f2f2;
-            border-radius: 40px; border: 12px solid #333; position: relative;
-            display: flex; flex-direction: column;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.2); flex-shrink: 0; align-self: center;
-            transition: transform 0.8s ease, box-shadow 0.8s ease;
-            z-index: 10;
-        }
-        .iphone-mockup.focused {
-            z-index: 101; transform: scale(1.02); 
-            box-shadow: 0 0 80px rgba(255,255,255,0.4), 0 30px 60px rgba(0,0,0,0.5); 
-        }
-
-        /* 右侧工作台 */
-        .agent-workbench {
-            flex: 1; background: #fff; border-radius: 12px; position: relative;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1); display: flex; overflow: hidden; border: 1px solid #ccc;
-            transition: transform 0.8s ease, box-shadow 0.8s ease;
-            z-index: 10;
-        }
-        .agent-workbench.focused { 
-            z-index: 101; transform: scale(1.01); 
-            box-shadow: 0 0 80px rgba(255,255,255,0.4), 0 30px 60px rgba(0,0,0,0.5); 
-        }
-
-        /* === 内部遮罩层 === */
-        .internal-mask {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 150; 
-            opacity: 0; pointer-events: none;
-            transition: opacity 0.8s ease;
-        }
-        .agent-workbench.dimmed .internal-mask { opacity: 1; pointer-events: auto; }
-
-        /* 特写元素 */
-        .focused-element {
-            z-index: 200 !important; 
-            position: relative;
-            box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.6), 0 0 30px rgba(255, 255, 255, 0.9) !important;
-            background-color: #fff; border-radius: 4px; transition: all 0.8s ease;
-        }
-
-        /* 普通样式 */
-        .iphone-notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 150px; height: 30px; background: #333; border-bottom-left-radius: 15px; border-bottom-right-radius: 15px; z-index: 10; }
-        .iphone-status-bar { height: 44px; display: flex; justify-content: space-between; padding: 12px 20px 0; font-size: 12px; font-weight: bold; }
-        .iphone-nav { height: 44px; background: #f2f2f2; display: flex; align-items: center; padding: 0 15px; font-weight: 600; border-bottom: 1px solid #e0e0e0; }
-        .chat-area { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        .chat-area::-webkit-scrollbar { width: 0; }
-        .input-area { background: #fff; padding: 10px; border-top: 1px solid #ddd; padding-bottom: 25px; border-radius: 0 0 30px 30px; }
-        .input-row { display: flex; gap: 10px; }
-        .ios-input { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ddd; background: #f5f5f5; outline:none; transition: all 0.2s;}
-        .ios-input.typing { background: #fff; border-color: #34c759; box-shadow: 0 0 10px rgba(52, 199, 89, 0.5); }
-        .ios-btn { background: var(--ios-green); color: white; border: none; padding: 0 15px; border-radius: 20px; font-weight: 600; cursor: pointer; transition: transform 0.1s;}
-        .ios-btn:active, .ios-btn.clicked { transform: scale(0.9); opacity: 0.8; }
-
-        .layout-col { display: flex; flex-direction: column; overflow: hidden; position: relative; }
-        .resizer { width: var(--resizer-width); background: #f0f0f0; cursor: col-resize; flex-shrink: 0; z-index: 20; border-left: 1px solid #e8e8e8; border-right: 1px solid #e8e8e8; transition: 0.2s;}
-        .resizer:hover { background: var(--agent-blue); }
-        
-        .col-sessions { width: 240px; min-width: 180px; max-width: 400px; background: #f7f9fc; flex-shrink: 0; }
-        .col-chat { flex: 1; min-width: 350px; }
-        .col-sop { width: 450px; min-width: 320px; max-width: 800px; background: #fafafa; flex-shrink: 0; }
-
-        .session-header, .agent-header, .sop-header { padding: 0 15px; height: 60px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; background: #fff; flex-shrink: 0; font-weight: bold;}
-        .sop-header { justify-content: space-between; }
-        .session-list, .sop-content { flex: 1; overflow-y: auto; padding: 15px; position: relative; }
-        .session-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
-        .session-item.active { background: #e6f7ff; border-left: 3px solid var(--agent-blue); }
-        
-        .agent-chat-body { flex: 1; background: #fdfdfd; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        .agent-input-wrapper { height: 160px; border-top: 1px solid var(--border-color); padding: 10px 20px; display: flex; flex-direction: column; background: #fff; flex-shrink: 0;}
-        .agent-textarea { flex: 1; border: none; resize: none; outline: none; font-size: 14px; margin-bottom: 5px;}
-        .toolbar { display: flex; gap: 15px; color: #666; font-size: 13px; margin-bottom: 8px; }
-
-        .sidebar-section { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; transition: all 0.3s; margin-bottom: 15px;}
-        .disabled-section { opacity: 0.5; pointer-events: none; filter: grayscale(1); }
-        .section-title { font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 3px solid var(--agent-blue); padding-left: 8px; display: flex; justify-content: space-between; align-items: center;}
-
-        .waybill-list { max-height: 450px; overflow-y: auto; margin-bottom: 10px; border: 1px solid #f0f0f0; border-radius: 4px;}
-        .waybill-item { padding: 10px; border-bottom: 1px solid #f0f0f0; cursor: pointer; font-size: 12px; display: flex; gap: 10px; align-items: flex-start; }
-        .waybill-item:hover { background: #f9f9f9; }
-        .waybill-item.selected { background: #e6f7ff; border-left: 3px solid var(--agent-blue); }
-        .radio-custom { width: 16px; height: 16px; border: 1px solid #ccc; border-radius: 50%; margin-top: 2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;}
-        .waybill-item.selected .radio-custom { border-color: var(--agent-blue); }
-        .waybill-item.selected .radio-custom::after { content: ''; width: 8px; height: 8px; background: var(--agent-blue); border-radius: 50%; }
-
-        .role-tag { font-size: 10px; padding: 1px 4px; border-radius: 2px; margin-right: 5px; }
-        .role-sender { border: 1px solid var(--agent-blue); color: var(--agent-blue); background: #e6f7ff; }
-        .role-recipient { border: 1px solid #fa8c16; color: #fa8c16; background: #fff7e6; }
-        
-        .action-btn { width: 100%; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-top: 5px; border: 1px solid transparent; transition: transform 0.1s;}
-        .action-btn:active { transform: scale(0.98); }
-        .action-btn.primary { background: var(--agent-blue); color: white; }
-        .action-btn.secondary { background: white; border-color: var(--agent-blue); color: var(--agent-blue); }
-        .action-btn:disabled { background: #f5f5f5; color: #ccc; border-color: #ddd; cursor: not-allowed; }
-
-        .confirm-time { font-size: 11px; color: #52c41a; font-family: monospace; margin-top: 4px; display: block; }
-        .confirm-time::before { content: '⏱ 确认时间: '; color: #999; }
-        .script-box { background: #e6f7ff; border: 1px dashed #1890ff; padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 12px; color: #333; }
-        .auto-tag { font-size: 10px; background: #52c41a; color: white; padding: 2px 4px; border-radius: 4px; float: right; }
-
-        .message-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; }
-        .chat-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .avatar-user { background: #fff1b8; border: 1px solid #ffe58f; }
-        .avatar-agent { background: #bae7ff; border: 1px solid #91d5ff; }
-        .bubble-container { display: flex; flex-direction: column; max-width: 75%; }
-        .message-bubble { padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
-        .msg-time { font-size: 10px; color: #999; margin-top: 2px; }
-
-        #phone-chat-box .row-left { flex-direction: row; }
-        #phone-chat-box .row-right { flex-direction: row-reverse; }
-        #phone-chat-box .row-left .msg-time { text-align: left; }
-        #phone-chat-box .row-right .msg-time { text-align: right; }
-        #phone-chat-box .row-left .message-bubble { background: #fff; color: #333; border-top-left-radius: 2px; }
-        #phone-chat-box .row-right .message-bubble { background: var(--ios-green); color: white; border-top-right-radius: 2px; }
-
-        #agent-chat-box .row-left { flex-direction: row; }
-        #agent-chat-box .row-right { flex-direction: row-reverse; }
-        #agent-chat-box .row-left .msg-time { text-align: left; }
-        #agent-chat-box .row-right .msg-time { text-align: right; }
-        #agent-chat-box .row-left .message-bubble { background: #fff; color: #333; border: 1px solid #eee; border-top-left-radius: 2px; }
-        #agent-chat-box .row-right .message-bubble { background: #e6f7ff; color: #333; border: 1px solid #bae7ff; border-top-right-radius: 2px; }
-
-        .chat-card { background: #fff; border-radius: 8px; overflow: hidden; width: 260px; margin-top: 5px; border: 1px solid #eee; }
-        .card-header { background: #f7f7f7; padding: 8px 12px; font-size: 12px; font-weight: bold; border-bottom: 1px solid #eee; color: #555; }
-        .card-content { padding: 10px 12px; font-size: 13px; color: #333; }
-        .card-line { display: flex; justify-content: space-between; margin-bottom: 6px; }
-        .card-btn { width: 100%; padding: 6px; background: #fff; border: 1px solid var(--agent-blue); color: var(--agent-blue); border-radius: 15px; font-size: 12px; cursor: pointer; margin-top: 5px;}
-        .card-btn:hover { background: #f0faff; }
-        .card-btn.confirmed { background: var(--ios-green); color: white; border-color: var(--ios-green); cursor: default; }
-        .copy-btn { border:1px solid #ddd; background:#fff; padding:1px 5px; font-size:10px; border-radius:4px; cursor:pointer; margin-left:5px; color:#666; }
-        .price-tag { color: #f5222d; font-weight: bold; }
-        .price-strike { text-decoration: line-through; color: #999; margin-right: 5px;}
-    </style>
-</head>
-<body>
-
-<!-- 动态水印层 -->
-<div class="watermark-layer"></div>
-
-<!-- 聚光灯暗色遮罩 -->
-<div id="focus-overlay"></div>
-
-<!-- 开始遮罩 -->
-<div id="start-overlay" class="overlay">
-    <div class="overlay-title">客服SOP系统 终局演示</div>
-    <div class="overlay-sub">Scenario: 丝滑聚光灯收缩 / 自动小结 / 完美闭环</div>
-    <div class="btn-group">
-        <button class="primary-btn btn-manual" onclick="window.startDemo('manual')">👤 人工 SOP</button>
-        <button class="primary-btn btn-auto" onclick="window.startDemo('auto')">🤖 自动 SOP</button>
-    </div>
-    <div class="overlay-footer">design by 张君勖</div>
-</div>
-
-<!-- 结束遮罩 (静态文字 + 渐显) -->
-<div id="end-overlay" class="overlay hidden">
-    <div class="overlay-title">✅ 演示流程完毕</div>
-    <div class="overlay-desc">
-刚才演示的画面可能出现在以下场景：
-1. 人工实时监看智能语音或者在线机器人服务过程的后台
-2. 人工SOP自动执行-客服人工监看
-3. 质检部门人工实时远程监看，人工客服工作过程
-
-当然实现以上能力需要一个非常强大，灵活，高效的配置运营后台才能实现
-    </div>
-    <button class="primary-btn btn-restart" onclick="window.restartDemo()">🔄 重新演示</button>
-    <div class="overlay-footer">design by 张君勖</div>
-</div>
-
-<div class="app-container">
-    <!-- 左侧手机 -->
-    <div class="iphone-mockup" id="phone-container">
-        <div class="iphone-notch"></div>
-        <div class="iphone-status-bar"><span>9:41</span><span>📶 5G 🔋</span></div>
-        <div class="iphone-nav">
-            <span style="font-size:24px; margin-right:10px;">‹</span>
-            <span>官方客服</span>
-            <span style="margin-left:auto;">•••</span>
-        </div>
-        <div class="chat-area" id="phone-chat-box"></div>
-        <div class="input-area">
-            <div class="input-row">
-                <input type="text" class="ios-input" id="phone-input" placeholder="输入消息..." autocomplete="off">
-                <button class="ios-btn" id="phone-send-btn" onclick="window.userSend()">发送</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 右侧工作台 -->
-    <div class="agent-workbench" id="workbench-container">
-        <!-- 内部遮罩层 -->
-        <div class="internal-mask"></div>
-
-        <!-- 自动操作提示 -->
-        <div id="auto-toast" class="auto-toast">
-            <div class="spinner"></div>
-            <span>系统自动推荐并发送</span>
-        </div>
-
-        <div class="layout-col col-sessions" id="col-sessions">
-            <div class="session-header">💬 历史记录</div>
-            <div class="session-list" id="session-list-container"></div>
-        </div>
-
-        <div class="resizer" id="resizer-left"></div>
-
-        <div class="layout-col col-chat" id="col-chat">
-            <div class="agent-header">
-                <div class="user-info">
-                    <div class="avatar-circle">👤</div>
-                    <div>
-                        <div style="font-weight: bold;">王先生 <span style="font-size:12px; background:#f5a623; color:#fff; padding:0 4px; border-radius:2px;">钻石</span></div>
-                        <div style="font-size: 11px; color: #888;">进线来源: 京顺快递小程序</div>
-                    </div>
-                </div>
-            </div>
-            <div class="agent-chat-body" id="agent-chat-box"></div>
-            <div class="agent-input-wrapper">
-                <div class="toolbar"><span>⚡ 快捷语</span> <span>🖼 图片</span> <span>📂 知识库</span></div>
-                <textarea class="agent-textarea" id="agent-input" placeholder="输入回复 (Enter发送)"></textarea>
-                <div><button class="action-btn primary" style="width:auto; float:right; margin:0;" onclick="window.agentSend()">发送</button></div>
-            </div>
-        </div>
-
-        <div class="resizer" id="resizer-right"></div>
-
-        <div class="layout-col col-sop" id="col-sop">
-            <div class="sop-header">
-                <div style="font-weight:bold;">工单处理 <span style="background:#e6f7ff; color:#1890ff; font-size:11px; padding:2px 5px; border-radius:4px;">进行中</span></div>
-                <div style="font-size:12px; color:#888;" id="event-id-display">--</div>
-            </div>
-            
-            <div class="sop-content">
-                <div class="sidebar-section" id="section-waybill">
-                    <div class="section-title">
-                        <span>📦 运单选择 (单选)</span>
-                        <button id="btn-reset-waybill" onclick="window.resetWaybillSelection()" style="display:none; border:none; background:none; color:#1890ff; cursor:pointer; font-size:12px;">🔄 重新选择</button>
-                    </div>
-                    <div class="waybill-list" id="waybill-list-container"></div>
-                    <button class="action-btn secondary" id="btn-send-cards" onclick="window.sendWaybillCard()" disabled>发送运单卡片给用户</button>
-                </div>
-
-                <div class="sidebar-section disabled-section" id="section-biz">
-                    <div class="section-title">🔧 改址操作</div>
-                    <div id="biz-step-ask">
-                        <div class="form-label" style="font-size:12px; margin-bottom:5px;">推荐话术</div>
-                        <div class="script-box">请问您需要把地址改成哪里，直接发送我即可</div>
-                        <button id="btn-ask-addr" class="action-btn primary" onclick="window.sendAskAddrScript()">发送话术</button>
-                    </div>
-
-                    <div id="biz-step-confirm" style="display:none; margin-top:15px; border-top:1px dashed #eee; padding-top:10px;">
-                        <label class="form-label" style="font-size:12px; color:#666;">新收货地址 (等待识别...)</label>
-                        <div style="background:#f9f9f9; padding:8px; border-radius:4px; margin-bottom:10px; font-size:12px; color:#999;" id="formatted-address-box">等待用户回复...</div>
-                        <button class="action-btn primary" id="btn-send-addr-confirm" onclick="window.sendAddressConfirmCard()">发送地址确认卡片</button>
-                        <div id="addr-confirmed-msg" style="display:none; margin-top:5px; font-size:12px;">
-                            ✅ 用户已确认地址 <span id="addr-confirm-time" class="confirm-time"></span>
-                        </div>
-                    </div>
-
-                    <div id="auto-script-display" class="script-box" style="display:none; margin-top:10px; background:#f6ffed; border-color:#b7eb8f;">
-                        <span class="auto-tag">系统自动发送</span>
-                        <b>推荐话术：</b><br> "温馨提示：根据跨区转寄规则，该订单将产生5元转寄费，请您确认。"
-                    </div>
-                </div>
-
-                <div class="sidebar-section disabled-section" id="section-fee">
-                    <div class="section-title">💰 运费补差</div>
-                    <div style="font-size:13px; margin-bottom:10px;">
-                        <div>原运费：<span class="price-strike">12.00元</span></div>
-                        <div>改址后：<span class="price-tag">17.00元</span> (跨区+5元)</div>
-                    </div>
-                    <button class="action-btn secondary" id="btn-send-fee" onclick="window.sendFeeCard()">发送费用确认卡片</button>
-                    <div id="fee-confirmed-msg" style="display:none; margin-top:5px; font-size:12px;">
-                        ✅ 用户已接受费用 <span id="fee-confirm-time" class="confirm-time"></span>
-                    </div>
-                </div>
-
-                <div class="sidebar-section" id="section-summary">
-                    <div class="section-title">📝 服务小结</div>
-                    <textarea class="agent-textarea" id="summary-text" style="height:60px; background:#f5f5f5;" placeholder="处理备注..."></textarea>
-                    <button class="action-btn primary" id="btn-finish-event" onclick="window.finishEvent()">完成工单 & 归档</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    /* ========== 全局变量与状态 ========== */
-    const globalHistory = [];
-    const ACTION_DELAY = 3000;
-
-    window.state = {
-        sessionId: '', eventId: '', step: 0, isAuto: false,
-        waybills: [
-            { id: 'JSVA001234567', status: '运输中', route: '上海 -> 北京', goods: 'iPhone 15 Pro', role: '寄件人', date: '2023-10-25 14:00' },
-            { id: 'JSVA009876543', status: '派送中', route: '广州 -> 深圳', goods: '机械键盘', role: '收件人', date: '2023-10-25 09:30' },
-            { id: 'JSVA004567890', status: '已签收', route: '成都 -> 西安', goods: '特产大礼包', role: '收件人', date: '2023-10-24 18:20' }
-        ],
-        selectedWaybillId: null, confirmedWaybillId: null,
-    };
-
-    /* ========== 工具类函数 ========== */
-    const delay = ms => new Promise(res => setTimeout(res, ms));
-    const getTimeStr = () => {
-        const now = new Date();
-        return `${String(now.getHours()).padStart(2,0)}:${String(now.getMinutes()).padStart(2,0)}:${String(now.getSeconds()).padStart(2,0)}.${String(now.getMilliseconds()).padStart(3,0)}`;
-    };
-
-    /* ========== 聚光灯控制 (Focus System) ========== */
-    window.setFocus = function(targetType, selector) {
-        const overlay = document.getElementById('focus-overlay');
-        const phone = document.getElementById('phone-container');
-        const workbench = document.getElementById('workbench-container');
-
-        document.querySelectorAll('.focused-element').forEach(el => el.classList.remove('focused-element'));
-
-        if (targetType === 'none') {
-            overlay.classList.remove('active');
-            phone.classList.remove('focused');
-            workbench.classList.remove('focused');
-            workbench.classList.remove('dimmed');
-        } 
-        else if (targetType === 'phone') {
-            overlay.classList.add('active');
-            phone.classList.add('focused');
-            workbench.classList.remove('focused');
-            workbench.classList.remove('dimmed');
-        } 
-        else if (targetType === 'agent') {
-            overlay.classList.add('active');
-            workbench.classList.add('focused');
-            workbench.classList.remove('dimmed'); 
-            phone.classList.remove('focused');
-        } 
-        else if (targetType === 'element' && selector) {
-            overlay.classList.add('active');
-            workbench.classList.add('focused'); 
-            workbench.classList.add('dimmed'); 
-            phone.classList.remove('focused');
-
-            const el = document.querySelector(selector);
-            if(el) {
-                el.classList.add('focused-element'); 
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }
-    }
-
-    /* ========== 拟人化打字模拟 ========== */
-    window.simulateTyping = async function(selector, text, isPhone) {
-        const input = document.querySelector(selector);
-        if(!input) return;
-        
-        if (isPhone) {
-            window.setFocus('phone');
-        } else {
-            window.setFocus('agent');
-            await delay(1000);
-            window.setFocus('element', selector);
-        }
-
-        input.value = '';
-        input.classList.add('typing'); 
-        await delay(500);
-
-        for (let char of text) {
-            input.value += char;
-            await delay(30 + Math.random() * 80); 
-        }
-        
-        input.classList.remove('typing');
-        await delay(500); 
-        
-        if (isPhone) {
-            const btn = document.getElementById('phone-send-btn');
-            btn.classList.add('clicked');
-            await delay(200);
-            btn.classList.remove('clicked');
-            window.userSend();
-        }
-    }
-
-    /* ========== 自动化引擎 (AutoPilot) ========== */
-    window.runAutoSequence = async function() {
-        if (!window.state.isAuto) return;
-
-        // 1. 开场
-        await delay(1000);
-        await window.simulateTyping("#phone-input", "我想改下运单地址", true);
-        
-        await delay(1000);
-        window.setFocus('element', '#col-chat'); 
-        await delay(1000);
-        window.appendMessage('agent', '您好，京顺客服很高兴为你服务，请问您有什么诉求');
-        
-        // 2. 推荐运单
-        await delay(1500);
-        window.setFocus('agent');
-        await delay(1000);
-        await window.showAutoToast();
-        if (!window.state.selectedWaybillId) window.selectWaybill(window.state.waybills[0].id);
-        
-        window.setFocus('element', '#btn-send-cards'); 
-        await delay(ACTION_DELAY); 
-        window.sendWaybillCard();
-        
-        // RESULT
-        window.setFocus('element', '#col-chat');
-        await delay(2000);
-
-        // 用户确认
-        window.setFocus('phone');
-        await delay(1500);
-        const wbId = window.state.selectedWaybillId;
-        const btnWb = document.getElementById(`btn-wb-${wbId}`);
-        if(btnWb) {
-            btnWb.style.transform = "scale(0.9)";
-            await delay(200);
-            btnWb.style.transform = "scale(1)";
-            window.confirmWaybillByUser(wbId);
-        }
-        
-        // 3. 询问地址
-        await delay(1500);
-        window.setFocus('element', '#btn-ask-addr'); 
-        await window.showAutoToast();
-        await delay(ACTION_DELAY); 
-        window.sendAskAddrScript();
-
-        // RESULT
-        window.setFocus('element', '#col-chat');
-        await delay(2000);
-
-        // 用户输入
-        await window.simulateTyping("#phone-input", "北京市海淀区中关村软件园", true);
-
-        // 4. 确认地址
-        await delay(1500);
-        window.setFocus('element', '#btn-send-addr-confirm'); 
-        await window.showAutoToast();
-        await delay(ACTION_DELAY);
-        window.sendAddressConfirmCard();
-
-        // RESULT
-        window.setFocus('element', '#col-chat');
-        await delay(2000);
-
-        // 用户确认
-        window.setFocus('phone');
-        await delay(1500);
-        const btnAddr = document.getElementById('btn-addr-yes');
-        if(btnAddr) {
-            btnAddr.style.transform = "scale(0.9)";
-            await delay(200);
-            btnAddr.style.transform = "scale(1)";
-            window.confirmAddrByUser();
-        }
-
-        // 5. 发送运费
-        await delay(1500);
-        window.setFocus('agent'); 
-        await delay(1000);
-        window.setFocus('element', '#btn-send-fee'); 
-        await delay(1000); 
-        await window.showAutoToast();
-        await delay(ACTION_DELAY); 
-        window.sendFeeCard();
-
-        // RESULT
-        window.setFocus('element', '#col-chat');
-        await delay(2000);
-
-        // 用户支付
-        window.setFocus('phone');
-        await delay(1500);
-        const btnFee = document.getElementById('btn-fee-yes');
-        if(btnFee) {
-            btnFee.style.transform = "scale(0.9)";
-            await delay(200);
-            btnFee.style.transform = "scale(1)";
-            window.confirmFeeByUser();
-        }
-
-        // 6. 结束语
-        await delay(1500);
-        window.setFocus('element', '#col-chat'); 
-        await window.showAutoToast();
-        window.appendMessage('agent', "运单地址修改成功，请您到小程序支付运费即可，祝您生活愉快；还有其他问题可以帮您吗？");
-
-        // 用户回复
-        await delay(2000);
-        await window.simulateTyping("#phone-input", "没有了，谢谢", true);
-
-        // 7. 自动小结
-        await delay(1500);
-        await window.simulateTyping("#summary-text", "用户作为寄件人需要改址，已经修改完成，服务结束", false);
-        
-        await delay(1000);
-        window.setFocus('element', '#btn-finish-event'); 
-        await delay(ACTION_DELAY); 
-        window.finishEvent();
-        window.setFocus('none');
-    }
-
-    window.showAutoToast = async function() {
-        const toast = document.getElementById('auto-toast');
-        toast.classList.add('show');
-        await delay(1500);
-        toast.classList.remove('show');
-        await delay(500);
-    }
-
-    // --- 启动入口 ---
-    window.startDemo = function(mode) {
-        window.state.isAuto = (mode === 'auto');
-        const startOverlay = document.getElementById('start-overlay');
-        startOverlay.classList.add('hidden');
-        window.startNewSession();
-    }
-
-    window.restartDemo = function() {
-        const endOverlay = document.getElementById('end-overlay');
-        endOverlay.classList.add('hidden');
-        setTimeout(() => {
-            const startOverlay = document.getElementById('start-overlay');
-            startOverlay.classList.remove('hidden');
-        }, 500);
-    }
-
-    // --- 会话生命周期 ---
-    window.startNewSession = function() {
-        window.state.eventId = 'TK-' + Math.floor(Math.random()*10000000);
-        window.state.sessionId = 'SES-' + Date.now();
-        window.state.step = 0; 
-        window.state.selectedWaybillId = null; 
-        window.state.confirmedWaybillId = null;
-
-        document.getElementById('phone-chat-box').innerHTML = '';
-        document.getElementById('agent-chat-box').innerHTML = '';
-        document.getElementById('event-id-display').textContent = window.state.eventId;
-        renderWaybillList();
-        resetSection('section-biz');
-        resetSection('section-fee');
-        document.getElementById('auto-script-display').style.display = 'none';
-        document.getElementById('summary-text').value = '';
-        document.getElementById('btn-send-cards').textContent = '发送运单卡片给用户';
-        document.getElementById('btn-send-cards').disabled = true;
-        document.getElementById('btn-reset-waybill').style.display = 'none';
-        renderHistoryList();
-        
-        window.setFocus('none');
-
-        if (window.state.isAuto) {
-            window.runAutoSequence();
-        } else {
-            setTimeout(() => window.appendMessage('user', '我想改下运单地址'), 600);
-            setTimeout(() => window.appendMessage('agent', '您好，京顺客服很高兴为你服务，请问您有什么诉求'), 1600);
-        }
-    }
-
-    function resetSection(id) {
-        const el = document.getElementById(id);
-        el.classList.add('disabled-section');
-        if (id === 'section-biz') {
-            document.getElementById('biz-step-ask').style.display = 'block';
-            document.getElementById('btn-ask-addr').textContent = '发送话术';
-            document.getElementById('btn-ask-addr').disabled = false;
-            document.getElementById('biz-step-confirm').style.display = 'none';
-            document.getElementById('formatted-address-box').textContent = '等待用户回复...';
-            document.getElementById('addr-confirmed-msg').style.display = 'none';
-            document.getElementById('btn-send-addr-confirm').textContent = '发送地址确认卡片';
-            document.getElementById('btn-send-addr-confirm').disabled = false;
-        }
-        if (id === 'section-fee') {
-            document.getElementById('fee-confirmed-msg').style.display = 'none';
-            document.getElementById('btn-send-fee').textContent = '发送费用确认卡片';
-            document.getElementById('btn-send-fee').disabled = false;
-        }
-    }
-
-    // --- 运单操作 ---
-    function renderWaybillList() {
-        const container = document.getElementById('waybill-list-container');
-        const sorted = [...window.state.waybills].sort((a,b) => new Date(b.date) - new Date(a.date));
-        container.innerHTML = sorted.map(wb => {
-            if (window.state.confirmedWaybillId && wb.id !== window.state.confirmedWaybillId) return '';
-            const isSel = (window.state.selectedWaybillId === wb.id);
-            const isConf = (window.state.confirmedWaybillId === wb.id);
-            const onClick = isConf ? '' : `onclick="window.selectWaybill('${wb.id}')"`;
-            const bgClass = (isSel || isConf) ? 'selected' : '';
-            const roleClass = wb.role === '寄件人' ? 'role-sender' : 'role-recipient';
-            let timeHtml = isConf ? `<div class="confirm-time" id="wb-time-${wb.id}"></div>` : '';
-            return `<div class="waybill-item ${bgClass}" ${onClick}><div class="radio-custom"></div><div style="flex:1"><div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:2px;"><span>${wb.id}</span><span style="color:#fa8c16">${wb.status}</span></div><div style="margin-bottom:4px;"><span class="role-tag ${roleClass}">${wb.role}</span><span style="color:#999; font-size:11px;">${wb.date}</span></div><div style="color:#666;">${wb.route}</div>${timeHtml}</div></div>`;
-        }).join('');
-    }
-
-    window.selectWaybill = function(id) {
-        if (window.state.confirmedWaybillId) return;
-        window.state.selectedWaybillId = id;
-        renderWaybillList();
-        const btn = document.getElementById('btn-send-cards');
-        btn.disabled = false; btn.textContent = '发送运单卡片给用户';
-    }
-
-    window.resetWaybillSelection = function() {
-        window.state.confirmedWaybillId = null; window.state.selectedWaybillId = null; window.state.step = 1; 
-        renderWaybillList();
-        document.getElementById('btn-reset-waybill').style.display = 'none';
-        document.getElementById('btn-send-cards').textContent = '重新发送运单卡片';
-        document.getElementById('btn-send-cards').disabled = true;
-        document.getElementById('section-biz').classList.add('disabled-section');
-        document.getElementById('auto-script-display').style.display = 'none';
-        document.getElementById('section-fee').classList.add('disabled-section');
-    }
-
-    window.sendWaybillCard = function() {
-        if (!window.state.selectedWaybillId) return;
-        const wb = window.state.waybills.find(w => w.id === window.state.selectedWaybillId);
-        const html = `<div class="chat-card"><div class="card-header">请核对您的运单信息</div><div class="card-content" style="border-bottom:1px solid #eee"><div class="card-line"><span style="font-weight:bold;">${wb.id}</span></div><div class="card-line" style="font-size:11px; color:#666;"><span>${wb.route}</span></div><div class="card-line" style="font-size:11px; color:#999;">${wb.date}</div><button class="card-btn" id="btn-wb-${wb.id}" onclick="window.confirmWaybillByUser('${wb.id}')">确认是此单</button></div></div>`;
-        window.appendMessage('agent', html, true);
-        window.state.step = 1;
-        document.getElementById('btn-send-cards').textContent = '等待用户确认...';
-        document.getElementById('btn-send-cards').disabled = true;
-    }
-
-    window.confirmWaybillByUser = function(id) {
-        if (window.state.step !== 1) return;
-        document.getElementById(`btn-wb-${id}`).textContent = '已确认';
-        document.getElementById(`btn-wb-${id}`).className += ' confirmed';
-        window.appendMessage('user', `我确认是这个运单：${id}`);
-        window.state.confirmedWaybillId = id; window.state.step = 2; 
-        renderWaybillList(); 
-        document.getElementById(`wb-time-${id}`).textContent = getTimeStr();
-        document.getElementById('btn-reset-waybill').style.display = 'inline-block';
-        document.getElementById('section-biz').classList.remove('disabled-section');
-    }
-
-    window.sendAskAddrScript = function() {
-        window.appendMessage('agent', "请问您需要把地址改成哪里，直接发送我即可");
-        document.getElementById('btn-ask-addr').textContent = '已发送';
-        document.getElementById('btn-ask-addr').disabled = true;
-        document.getElementById('biz-step-confirm').style.display = 'block';
-        window.state.step = 2.5; 
-    }
-
-    window.sendAddressConfirmCard = function() {
-        const addr = document.getElementById('formatted-address-box').innerText;
-        if(addr.includes('等待')) return;
-        const html = `<div class="chat-card"><div class="card-header">改址信息确认</div><div class="card-content"><div>新地址：</div><div style="background:#f5f5f5; padding:5px; margin:5px 0;">${addr}</div><button class="card-btn" id="btn-addr-yes" onclick="window.confirmAddrByUser()">确认无误</button></div></div>`;
-        window.appendMessage('agent', html, true);
-        window.state.step = 3;
-        document.getElementById('btn-send-addr-confirm').textContent = '等待确认...';
-        document.getElementById('btn-send-addr-confirm').disabled = true;
-    }
-
-    window.confirmAddrByUser = function() {
-        document.getElementById('btn-addr-yes').textContent = '已确认';
-        document.getElementById('btn-addr-yes').className += ' confirmed';
-        window.appendMessage('user', '地址对的，改吧。');
-        window.state.step = 4;
-        document.getElementById('addr-confirmed-msg').style.display = 'block';
-        document.getElementById('addr-confirm-time').textContent = getTimeStr();
-        document.getElementById('btn-send-addr-confirm').textContent = '地址已确认';
-        
-        document.getElementById('auto-script-display').style.display = 'block';
-        setTimeout(() => {
-            window.appendMessage('agent', "温馨提示：根据跨区转寄规则，该订单将产生5元转寄费，请您确认。");
-            document.getElementById('section-fee').classList.remove('disabled-section');
-        }, 800);
-    }
-
-    window.sendFeeCard = function() {
-        const html = `<div class="chat-card"><div class="card-header">费用确认</div><div class="card-content"><div class="card-line"><span>转寄费</span> <span class="price-tag">5.00元</span></div><div style="font-size:12px; color:#999; margin-bottom:5px;">由系统自动计算</div><button class="card-btn" id="btn-fee-yes" onclick="window.confirmFeeByUser()">同意支付</button></div></div>`;
-        window.appendMessage('agent', html, true);
-        window.state.step = 5;
-        document.getElementById('btn-send-fee').disabled = true;
-        document.getElementById('btn-send-fee').textContent = '等待支付...';
-    }
-
-    window.confirmFeeByUser = function() {
-        document.getElementById('btn-fee-yes').textContent = '已同意';
-        document.getElementById('btn-fee-yes').className += ' confirmed';
-        window.appendMessage('user', '好的，确认支付。');
-        window.state.step = 6;
-        document.getElementById('fee-confirmed-msg').style.display = 'block';
-        document.getElementById('fee-confirm-time').textContent = getTimeStr();
-        document.getElementById('btn-send-fee').textContent = '费用已确认';
-    }
-
-    window.finishEvent = function() {
-        const summary = document.getElementById('summary-text').value;
-        globalHistory.unshift({ id: window.state.eventId, time: new Date().toLocaleTimeString(), summary: summary || (window.state.isAuto ? '自动SOP执行归档' : '标准改址流程完成') });
-        
-        const endOverlay = document.getElementById('end-overlay');
-        endOverlay.classList.remove('hidden'); 
-        
-        renderHistoryList();
-    }
-
-    function renderHistoryList() {
-        const container = document.getElementById('session-list-container');
-        let html = `<div class="session-item active"><div class="s-title">王先生 (当前)</div><div class="s-time">进行中...</div></div>`;
-        globalHistory.forEach(s => {
-            html += `<div class="session-item" style="opacity:0.6; background:#fff;"><div class="s-title">工单: ${s.id}</div><div class="s-time">${s.time}</div><div style="font-size:11px; color:#999; margin-top:4px;">${s.summary}</div></div>`;
-        });
-        container.innerHTML = html;
-    }
-
-    window.userSend = function() {
-        const input = document.getElementById('phone-input');
-        const text = input.value.trim();
-        if(!text) return;
-        window.appendMessage('user', text);
-        input.value = '';
-
-        if (window.state.step === 2.5 && text.length > 5) {
-            document.getElementById('formatted-address-box').innerText = text;
-            document.getElementById('formatted-address-box').style.color = '#333';
-        }
-    }
-
-    window.agentSend = function() {
-        const input = document.getElementById('agent-input');
-        const text = input.value.trim();
-        if(!text) return;
-        window.appendMessage('agent', text);
-        input.value = '';
-    }
-
-    window.appendMessage = function(sender, content, isHtml = false) {
-        const phoneBox = document.getElementById('phone-chat-box');
-        const agentBox = document.getElementById('agent-chat-box');
-        const time = getTimeStr();
-        const avatarUser = `<div class="chat-avatar avatar-user">👤</div>`;
-        const avatarAgent = `<div class="chat-avatar avatar-agent">🎧</div>`;
-        const createRow = (type, inner) => { const div = document.createElement('div'); div.className = `message-row ${type}`; div.innerHTML = inner; return div; };
-        const createBubble = (text, timeStr) => `<div class="bubble-container"><div class="message-bubble">${text}</div><div class="msg-time">${timeStr}</div></div>`;
-
-        if (sender === 'user') {
-            phoneBox.appendChild(createRow('row-right', avatarUser + createBubble(content, time)));
-        } else {
-            phoneBox.appendChild(createRow('row-left', avatarAgent + createBubble(content, time)));
-        }
-
-        if (sender === 'agent') {
-            agentBox.appendChild(createRow('row-right', avatarAgent + createBubble(content, time)));
-        } else {
-            agentBox.appendChild(createRow('row-left', avatarUser + createBubble(content, time)));
-        }
-
-        phoneBox.scrollTop = phoneBox.scrollHeight;
-        agentBox.scrollTop = agentBox.scrollHeight;
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const setupResizer = (resizer, target, isLeft) => {
-            resizer.addEventListener('mousedown', (e) => {
-                e.preventDefault(); 
-                document.body.style.cursor = 'col-resize';
-                const startX = e.clientX; const startW = parseInt(window.getComputedStyle(target).width, 10);
-                const doDrag = (e) => {
-                    const newW = isLeft ? startW + e.clientX - startX : startW - (e.clientX - startX);
-                    if (newW > 150 && newW < 800) target.style.width = newW + 'px';
-                };
-                const stopDrag = () => {
-                    document.body.style.cursor = 'default';
-                    document.removeEventListener('mousemove', doDrag); 
-                    document.removeEventListener('mouseup', stopDrag);
-                };
-                document.addEventListener('mousemove', doDrag); 
-                document.addEventListener('mouseup', stopDrag);
-            });
-        };
-        setupResizer(document.getElementById('resizer-left'), document.getElementById('col-sessions'), true);
-        setupResizer(document.getElementById('resizer-right'), document.getElementById('col-sop'), false);
-        
-        document.getElementById('phone-input').addEventListener('keypress', (e) => e.key === 'Enter' && window.userSend());
-        document.getElementById('agent-input').addEventListener('keypress', (e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), window.agentSend()));
-    });
-</script>
-</body>
-</html>
+:root {
+  --bg-color: #dce4ef;
+  --ios-green: #34c759;
+  --agent-blue: #1890ff;
+  --agent-bg: #fff;
+  --border-color: #e8e8e8;
+  --text-main: #333;
+  --resizer-width: 6px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--bg-color);
+  overflow: hidden;
+  padding: 20px;
+  position: relative;
+}
+
+/* 1. 动态水印 */
+.watermark-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.08;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' transform='rotate(-30, 200, 200)' font-size='24' font-family='sans-serif' fill='%23000'%3Edesign by zhangjunxu%3C/text%3E%3C/svg%3E");
+  animation: watermarkMove 60s linear infinite;
+}
+@keyframes watermarkMove {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 600px 600px;
+  }
+}
+
+/* 2. 聚光灯暗色遮罩 */
+#focus-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+#focus-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 3. 开始/结束 弹窗 */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  backdrop-filter: blur(10px);
+  transition: opacity 0.4s ease-in-out, visibility 0.4s;
+  opacity: 1;
+  visibility: visible;
+}
+.overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.overlay-title {
+  font-size: 38px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  letter-spacing: 1px;
+}
+.overlay-sub {
+  font-size: 16px;
+  opacity: 0.8;
+  margin-bottom: 50px;
+  font-weight: 300;
+}
+
+.overlay-desc {
+  text-align: left;
+  line-height: 1.8;
+  max-width: 700px;
+  margin-bottom: 40px;
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 30px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.overlay-footer {
+  position: absolute;
+  bottom: 30px;
+  font-size: 16px;
+  font-weight: bold;
+  opacity: 0.6;
+  letter-spacing: 1px;
+  font-family: monospace;
+}
+
+.btn-group {
+  display: flex;
+  gap: 30px;
+}
+.primary-btn {
+  padding: 18px 45px;
+  font-size: 18px;
+  font-weight: bold;
+  color: white;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.btn-manual {
+  background: linear-gradient(135deg, #1890ff, #096dd9);
+}
+.btn-auto {
+  background: linear-gradient(135deg, #722ed1, #531dab);
+}
+.btn-restart {
+  background: linear-gradient(135deg, #fa8c16, #d46b08);
+}
+.primary-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* 4. Toast */
+.auto-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 15px 30px;
+  border-radius: 40px;
+  font-size: 16px;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.auto-toast.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid #fff;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 5. 容器与聚光灯 */
+.app-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  max-width: 1900px;
+  gap: 20px;
+  align-items: stretch;
+  position: relative;
+}
+
+.iphone-mockup {
+  width: 375px;
+  height: 100%;
+  max-height: 850px;
+  background: #f2f2f2;
+  border-radius: 40px;
+  border: 12px solid #333;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  align-self: center;
+  transition: transform 0.8s ease, box-shadow 0.8s ease;
+  z-index: 10;
+}
+.iphone-mockup.focused {
+  z-index: 101;
+  transform: scale(1.02);
+  box-shadow: 0 0 80px rgba(255, 255, 255, 0.4), 0 30px 60px rgba(0, 0, 0, 0.5);
+}
+
+.agent-workbench {
+  flex: 1;
+  background: #fff;
+  border-radius: 12px;
+  position: relative;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+  display: flex;
+  overflow: hidden;
+  border: 1px solid #ccc;
+  transition: transform 0.8s ease, box-shadow 0.8s ease;
+  z-index: 10;
+}
+.agent-workbench.focused {
+  z-index: 101;
+  transform: scale(1.01);
+  box-shadow: 0 0 80px rgba(255, 255, 255, 0.4), 0 30px 60px rgba(0, 0, 0, 0.5);
+}
+
+.internal-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 150;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+}
+.agent-workbench.dimmed .internal-mask {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.focused-element {
+  z-index: 200 !important;
+  position: relative;
+  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.6),
+    0 0 30px rgba(255, 255, 255, 0.9) !important;
+  background-color: #fff;
+  border-radius: 4px;
+  transition: all 0.8s ease;
+}
+
+/* UI 组件 */
+.iphone-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 150px;
+  height: 30px;
+  background: #333;
+  border-bottom-left-radius: 15px;
+  border-bottom-right-radius: 15px;
+  z-index: 10;
+}
+.iphone-status-bar {
+  height: 44px;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 20px 0;
+  font-size: 12px;
+  font-weight: bold;
+}
+.iphone-nav {
+  height: 44px;
+  background: #f2f2f2;
+  display: flex;
+  align-items: center;
+  padding: 0 15px;
+  font-weight: 600;
+  border-bottom: 1px solid #e0e0e0;
+}
+.chat-area {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.chat-area::-webkit-scrollbar {
+  width: 0;
+}
+.input-area {
+  background: #fff;
+  padding: 10px;
+  border-top: 1px solid #ddd;
+  padding-bottom: 25px;
+  border-radius: 0 0 30px 30px;
+}
+.input-row {
+  display: flex;
+  gap: 10px;
+}
+.ios-input {
+  flex: 1;
+  padding: 10px;
+  border-radius: 20px;
+  border: 1px solid #ddd;
+  background: #f5f5f5;
+  outline: none;
+  transition: all 0.2s;
+}
+.ios-input.typing {
+  background: #fff;
+  border-color: #34c759;
+  box-shadow: 0 0 10px rgba(52, 199, 89, 0.5);
+}
+.ios-btn {
+  background: var(--ios-green);
+  color: white;
+  border: none;
+  padding: 0 15px;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.ios-btn:active,
+.ios-btn.clicked {
+  transform: scale(0.9);
+  opacity: 0.8;
+}
+
+.layout-col {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.resizer {
+  width: var(--resizer-width);
+  background: #f0f0f0;
+  cursor: col-resize;
+  flex-shrink: 0;
+  z-index: 20;
+  border-left: 1px solid #e8e8e8;
+  border-right: 1px solid #e8e8e8;
+  transition: 0.2s;
+}
+.resizer:hover {
+  background: var(--agent-blue);
+}
+
+.col-sessions {
+  width: 240px;
+  min-width: 180px;
+  max-width: 400px;
+  background: #f7f9fc;
+  flex-shrink: 0;
+}
+.col-chat {
+  flex: 1;
+  min-width: 350px;
+}
+.col-sop {
+  width: 450px;
+  min-width: 320px;
+  max-width: 800px;
+  background: #fafafa;
+  flex-shrink: 0;
+}
+
+.session-header,
+.agent-header,
+.sop-header {
+  padding: 0 15px;
+  height: 60px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  background: #fff;
+  flex-shrink: 0;
+  font-weight: bold;
+}
+.sop-header {
+  justify-content: space-between;
+}
+.session-list,
+.sop-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+  position: relative;
+}
+.session-item {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+.session-item.active {
+  background: #e6f7ff;
+  border-left: 3px solid var(--agent-blue);
+}
+
+.agent-chat-body {
+  flex: 1;
+  background: #fdfdfd;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.agent-input-wrapper {
+  height: 160px;
+  border-top: 1px solid var(--border-color);
+  padding: 10px 20px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  flex-shrink: 0;
+}
+.agent-textarea {
+  flex: 1;
+  border: none;
+  resize: none;
+  outline: none;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+.toolbar {
+  display: flex;
+  gap: 15px;
+  color: #666;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.sidebar-section {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 15px;
+  transition: all 0.3s;
+  margin-bottom: 15px;
+}
+.disabled-section {
+  opacity: 0.5;
+  pointer-events: none;
+  filter: grayscale(1);
+}
+.section-title {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  border-left: 3px solid var(--agent-blue);
+  padding-left: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.waybill-list {
+  max-height: 450px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+}
+.waybill-item {
+  padding: 10px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.waybill-item:hover {
+  background: #f9f9f9;
+}
+.waybill-item.selected {
+  background: #e6f7ff;
+  border-left: 3px solid var(--agent-blue);
+}
+.radio-custom {
+  width: 16px;
+  height: 16px;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.waybill-item.selected .radio-custom {
+  border-color: var(--agent-blue);
+}
+.waybill-item.selected .radio-custom::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: var(--agent-blue);
+  border-radius: 50%;
+}
+
+.role-tag {
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  margin-right: 5px;
+}
+.role-sender {
+  border: 1px solid var(--agent-blue);
+  color: var(--agent-blue);
+  background: #e6f7ff;
+}
+.role-recipient {
+  border: 1px solid #fa8c16;
+  color: #fa8c16;
+  background: #fff7e6;
+}
+
+.action-btn {
+  width: 100%;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  margin-top: 5px;
+  border: 1px solid transparent;
+  transition: transform 0.1s;
+}
+.action-btn:active {
+  transform: scale(0.98);
+}
+.action-btn.primary {
+  background: var(--agent-blue);
+  color: white;
+}
+.action-btn.secondary {
+  background: white;
+  border-color: var(--agent-blue);
+  color: var(--agent-blue);
+}
+.action-btn:disabled {
+  background: #f5f5f5;
+  color: #ccc;
+  border-color: #ddd;
+  cursor: not-allowed;
+}
+
+.confirm-time {
+  font-size: 11px;
+  color: #52c41a;
+  font-family: monospace;
+  margin-top: 4px;
+  display: block;
+}
+.confirm-time::before {
+  content: "⏱ 确认时间: ";
+  color: #999;
+}
+.script-box {
+  background: #e6f7ff;
+  border: 1px dashed #1890ff;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #333;
+}
+.auto-tag {
+  font-size: 10px;
+  background: #52c41a;
+  color: white;
+  padding: 2px 4px;
+  border-radius: 4px;
+  float: right;
+}
+
+.message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+}
+.chat-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+.avatar-user {
+  background: #fff1b8;
+  border: 1px solid #ffe58f;
+}
+.avatar-agent {
+  background: #bae7ff;
+  border: 1px solid #91d5ff;
+}
+.bubble-container {
+  display: flex;
+  flex-direction: column;
+  max-width: 75%;
+}
+.message-bubble {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+.msg-time {
+  font-size: 10px;
+  color: #999;
+  margin-top: 2px;
+}
+
+/* 手机端: User右 (绿), Agent左 (白) */
+#phone-chat-box .row-left {
+  flex-direction: row;
+}
+#phone-chat-box .row-right {
+  flex-direction: row-reverse;
+}
+#phone-chat-box .row-left .msg-time {
+  text-align: left;
+}
+#phone-chat-box .row-right .msg-time {
+  text-align: right;
+}
+#phone-chat-box .row-left .message-bubble {
+  background: #fff;
+  color: #333;
+  border-top-left-radius: 2px;
+}
+#phone-chat-box .row-right .message-bubble {
+  background: var(--ios-green);
+  color: white;
+  border-top-right-radius: 2px;
+}
+
+/* 客服端: User左 (白), Agent右 (蓝) */
+#agent-chat-box .row-left {
+  flex-direction: row;
+}
+#agent-chat-box .row-right {
+  flex-direction: row-reverse;
+}
+#agent-chat-box .row-left .msg-time {
+  text-align: left;
+}
+#agent-chat-box .row-right .msg-time {
+  text-align: right;
+}
+#agent-chat-box .row-left .message-bubble {
+  background: #fff;
+  color: #333;
+  border: 1px solid #eee;
+  border-top-left-radius: 2px;
+}
+#agent-chat-box .row-right .message-bubble {
+  background: #e6f7ff;
+  color: #333;
+  border: 1px solid #bae7ff;
+  border-top-right-radius: 2px;
+}
+
+.chat-card {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  width: 260px;
+  margin-top: 5px;
+  border: 1px solid #eee;
+}
+.card-header {
+  background: #f7f7f7;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  border-bottom: 1px solid #eee;
+  color: #555;
+}
+.card-content {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #333;
+}
+.card-line {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.copy-btn {
+  border: 1px solid #ddd;
+  background: #fff;
+  padding: 1px 5px;
+  font-size: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 5px;
+  color: #666;
+}
+.price-tag {
+  color: #f5222d;
+  font-weight: bold;
+}
+.price-strike {
+  text-decoration: line-through;
+  color: #999;
+  margin-right: 5px;
+}
