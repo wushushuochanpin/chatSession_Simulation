@@ -36,7 +36,7 @@ body {
   pointer-events: none;
   z-index: 9999;
   opacity: 0.08;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' transform='rotate(-30, 200, 200)' font-size='24' font-family='sans-serif' fill='%23000'%3Edesign by zhangjunxu%3C/text%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' transform='rotate(-30, 200, 200)' font-size='24' font-family='sans-serif' fill='%23000'%3Edesign by chenyiheng/zhangjunxu%3C/text%3E%3C/svg%3E");
   animation: watermarkMove 60s linear infinite;
 }
 @keyframes watermarkMove {
