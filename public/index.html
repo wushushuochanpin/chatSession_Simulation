@@ -817,7 +817,7 @@
           🤖 机器人&托管
         </button>
       </div>
-      <div class="overlay-footer">design by 智能服务部·陈以衡/张君勖</div>
+      <div class="overlay-footer">design by 京东物流·智能服务部</div>
     </div>
 
     <!-- 结束遮罩 (静态文字 + 渐显) -->
@@ -834,7 +834,7 @@
       <button class="primary-btn btn-restart" onclick="window.restartDemo()">
         🔄 重新演示
       </button>
-      <div class="overlay-footer">design by 智能服务部·陈以衡/张君勖</div>
+      <div class="overlay-footer">design by 京东物流·智能服务部</div>
     </div>
 
     <div class="app-container">
@@ -939,7 +939,7 @@
         <div class="layout-col col-sop" id="col-sop">
           <div class="sop-header">
             <div style="font-weight: bold">
-              工单处理
+              事件处理
               <span
                 style="
                   background: #e6f7ff;
@@ -1101,7 +1101,7 @@
                 id="btn-finish-event"
                 onclick="window.finishEvent()"
               >
-                完成工单 & 归档
+                完成事件 & 归档
               </button>
             </div>
           </div>
@@ -1628,7 +1628,7 @@
         const container = document.getElementById("session-list-container");
         let html = `<div class="session-item active"><div class="s-title">王先生 (当前)</div><div class="s-time">进行中...</div></div>`;
         globalHistory.forEach((s) => {
-          html += `<div class="session-item" style="opacity:0.6; background:#fff;"><div class="s-title">工单: ${s.id}</div><div class="s-time">${s.time}</div><div style="font-size:11px; color:#999; margin-top:4px;">${s.summary}</div></div>`;
+          html += `<div class="session-item" style="opacity:0.6; background:#fff;"><div class="s-title">事件: ${s.id}</div><div class="s-time">${s.time}</div><div style="font-size:11px; color:#999; margin-top:4px;">${s.summary}</div></div>`;
         });
         container.innerHTML = html;
       }

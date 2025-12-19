@@ -542,7 +542,7 @@ function renderHistoryList() {
   const container = document.getElementById("session-list-container");
   let html = `<div class="session-item active"><div class="s-title">王先生 (当前)</div><div class="s-time">进行中...</div></div>`;
   globalHistory.forEach((s) => {
-    html += `<div class="session-item" style="opacity:0.6; background:#fff;"><div class="s-title">工单: ${s.id}</div><div class="s-time">${s.time}</div><div style="font-size:11px; color:#999; margin-top:4px;">${s.summary}</div></div>`;
+    html += `<div class="session-item" style="opacity:0.6; background:#fff;"><div class="s-title">事件: ${s.id}</div><div class="s-time">${s.time}</div><div style="font-size:11px; color:#999; margin-top:4px;">${s.summary}</div></div>`;
   });
   container.innerHTML = html;
 }
